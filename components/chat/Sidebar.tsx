@@ -47,12 +47,24 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [showWorkflowMenu, setShowWorkflowMenu] = useState(false);
 
-  const filteredConversations = conversations.filter((conv) =>
-    conv.title.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Filter conversations by workflow and search query
+  const filteredConversations = conversations.filter((conv) => {
+    // Filter by search query
+    const matchesSearch = conv.title.toLowerCase().includes(searchQuery.toLowerCase());
+
+    // Filter by workflow (if user has multiple workflows)
+    if (user && user.workflows && user.workflows.length > 1 && selectedWorkflow) {
+      const matchesWorkflow = conv.workflowId === selectedWorkflow.id;
+      return matchesSearch && matchesWorkflow;
+    }
+
+    return matchesSearch;
+  });
 
   const handleNewConversation = () => {
-    createConversation();
+    // Create conversation associated with selected workflow
+    const workflowId = selectedWorkflow?.id;
+    createConversation(workflowId);
   };
 
   const handleDeleteConversation = (id: string, e: React.MouseEvent) => {

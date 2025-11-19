@@ -22,7 +22,7 @@ interface ChatStore {
 
   // Actions
   loadConversations: () => void;
-  createConversation: () => string;
+  createConversation: (workflowId?: string) => string;
   setCurrentConversation: (id: string | null) => void;
   getCurrentConversation: () => Conversation | null;
   addMessage: (conversationId: string, message: Message) => void;
@@ -53,11 +53,12 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     set({ conversations, currentConversationId: currentId });
   },
 
-  createConversation: () => {
+  createConversation: (workflowId?: string) => {
     const newConversation: Conversation = {
       id: `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       title: 'New Conversation',
       messages: [],
+      workflowId, // Associar ao workflow
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };

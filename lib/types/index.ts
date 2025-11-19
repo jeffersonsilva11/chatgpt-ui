@@ -24,6 +24,7 @@ export interface Conversation {
   id: string;
   title: string;
   messages: Message[];
+  workflowId?: string; // ID do workflow associado (RH, TI, etc)
   createdAt: number;
   updatedAt: number;
 }
@@ -91,6 +92,7 @@ export interface N8NRequest {
   }>;
   metadata: {
     conversaId: string;
+    workflowId?: string; // ID do workflow selecionado
     timestamp: string;
   };
 }
@@ -237,6 +239,7 @@ export interface UserProfile {
 export interface WorkflowSummary {
   id: string;
   name: string;
+  webhookUrl: string; // URL do webhook N8N para este workflow
   icon?: string;
   description?: string;
 }

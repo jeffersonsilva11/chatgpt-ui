@@ -80,13 +80,13 @@ export default function Home() {
       // Cmd/Ctrl + K for new conversation
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
-        createConversation();
+        createConversation(selectedWorkflow?.id);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [createConversation]);
+  }, [createConversation, selectedWorkflow]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -101,7 +101,7 @@ export default function Home() {
 
     // Create conversation if none exists
     if (!conversationId) {
-      conversationId = createConversation();
+      conversationId = createConversation(selectedWorkflow?.id);
     }
 
     // Add user message
@@ -127,14 +127,27 @@ export default function Home() {
 
       // Send to appropriate provider
       if (settings.provider.type === 'n8n' && settings.provider.n8n) {
+        // Use workflow-specific webhook URL if workflow is selected
+        let webhookUrl = settings.provider.n8n.webhookUrl;
+
+        if (selectedWorkflow?.webhookUrl) {
+          webhookUrl = selectedWorkflow.webhookUrl;
+        }
+
         // Validate N8N configuration
-        if (!settings.provider.n8n.webhookUrl || settings.provider.n8n.webhookUrl.trim() === '') {
+        if (!webhookUrl || webhookUrl.trim() === '') {
           throw new Error(
-            'N8N webhook URL not configured. Please configure it in Settings.'
+            selectedWorkflow
+              ? `Webhook URL not configured for workflow "${selectedWorkflow.name}".`
+              : 'N8N webhook URL not configured. Please configure it in Settings.'
           );
         }
 
-        const provider = new N8NProvider(settings.provider.n8n);
+        const provider = new N8NProvider({
+          ...settings.provider.n8n,
+          webhookUrl,
+        });
+
         const messageType: 'text' | 'image' | 'audio' =
           type === 'mixed' ? 'text' : type;
         const response = await provider.sendMessageWithRetry(
@@ -142,7 +155,8 @@ export default function Home() {
           messageType,
           file,
           conversationId,
-          currentConversation?.messages || []
+          currentConversation?.messages || [],
+          selectedWorkflow?.id
         );
 
         // Store full response for later use (includes image, type, etc)
