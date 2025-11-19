@@ -96,6 +96,13 @@ export default function Home() {
 
       // Send to appropriate provider
       if (settings.provider.type === 'n8n' && settings.provider.n8n) {
+        // Validate N8N configuration
+        if (!settings.provider.n8n.webhookUrl || settings.provider.n8n.webhookUrl.trim() === '') {
+          throw new Error(
+            'N8N webhook URL not configured. Please configure it in Settings.'
+          );
+        }
+
         const provider = new N8NProvider(settings.provider.n8n);
         const messageType: 'text' | 'image' | 'audio' =
           type === 'mixed' ? 'text' : type;
