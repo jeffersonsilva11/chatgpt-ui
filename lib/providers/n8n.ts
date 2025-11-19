@@ -28,34 +28,79 @@ export class N8NProvider {
       },
     };
 
+    // Use proxy by default to avoid CORS issues
+    const useProxy = this.config.useProxy !== false; // default true
+
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => {
         controller.abort();
       }, this.config.timeout || 30000);
 
-      const response = await fetch(this.config.webhookUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...this.config.headers,
-        },
-        body: JSON.stringify(request),
-        signal: controller.signal,
-      });
+      let response: Response;
+
+      if (useProxy) {
+        // Use Next.js API route proxy
+        response = await fetch('/api/n8n', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            webhookUrl: this.config.webhookUrl,
+            headers: this.config.headers,
+            timeout: this.config.timeout,
+            ...request,
+          }),
+          signal: controller.signal,
+        });
+      } else {
+        // Direct call to N8N webhook (may have CORS issues)
+        response = await fetch(this.config.webhookUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...this.config.headers,
+          },
+          body: JSON.stringify(request),
+          signal: controller.signal,
+        });
+      }
 
       clearTimeout(timeout);
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        // Try to get error message from response
+        try {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        } catch (parseError) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
       }
 
-      const data: N8NResponse = await response.json();
+      const data = await response.json();
+
+      // If using proxy, error is returned in response body
+      if (useProxy && data.error) {
+        throw new Error(data.error);
+      }
+
+      // Validate response structure
+      if (!data.resposta) {
+        throw new Error(
+          'Invalid N8N response format. The response must include a "resposta" field.'
+        );
+      }
+
       return data;
     } catch (error) {
       if (error instanceof Error) {
         if (error.name === 'AbortError') {
-          throw new Error('Request timeout. Please try again.');
+          throw new Error('Request timeout. Please try again or check your N8N server.');
+        }
+        if (error.name === 'TypeError' && error.message.includes('fetch')) {
+          throw new Error('Network error. Please check if the N8N webhook URL is accessible.');
         }
         throw new Error(`Failed to send message: ${error.message}`);
       }

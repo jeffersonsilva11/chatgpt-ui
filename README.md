@@ -201,6 +201,8 @@ GROK_API_KEY=xai-...
 
 ## 🔌 Integração N8N
 
+> **📖 Para documentação completa e detalhada sobre configuração do webhook N8N, consulte [N8N_WEBHOOK_EXAMPLE.md](./N8N_WEBHOOK_EXAMPLE.md)**
+
 ### Formato de Requisição
 
 ```json
@@ -232,10 +234,18 @@ GROK_API_KEY=xai-...
 
 ### Exemplo de Workflow N8N
 
-1. **Webhook Node** - Receber a requisição
+1. **Webhook Node** - Receber a requisição (Response Mode: "Last Node")
 2. **Function Node** - Processar os dados
 3. **HTTP Request Node** - Chamar a IA (OpenAI, etc)
-4. **Respond to Webhook** - Retornar a resposta
+4. **Set Node** - Formatar resposta com campo "resposta" obrigatório
+
+### Troubleshooting N8N
+
+- **Erro 404**: Verifique se a URL do webhook está correta e o workflow está ativo
+- **Erro 500**: Verifique os logs do N8N e a configuração do workflow
+- **Erro de JSON**: Certifique-se que o webhook retorna JSON com o campo "resposta"
+
+Para mais detalhes, exemplos de código e soluções de problemas, consulte [N8N_WEBHOOK_EXAMPLE.md](./N8N_WEBHOOK_EXAMPLE.md)
 
 ## 🛠️ Stack Técnica
 
