@@ -168,6 +168,68 @@ curl -X POST https://seu-n8n.com/webhook/seu-id/chat \
 6. (Opcional) Ajuste o timeout (padrão: 30 segundos)
 7. Salve as configurações
 
+## Solução de Problemas CORS
+
+### O que é CORS?
+
+CORS (Cross-Origin Resource Sharing) é uma política de segurança do navegador que impede que aplicações web façam requisições para domínios diferentes do domínio de origem.
+
+### Erro CORS Típico:
+
+```
+Access to fetch at 'http://localhost:5678/webhook/...' from origin 'http://localhost:3001'
+has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on
+the requested resource.
+```
+
+### ✅ Solução Recomendada: Usar o Proxy (Padrão)
+
+**Esta aplicação usa automaticamente um proxy Next.js** para contornar problemas de CORS. Você **não precisa fazer nada** - o proxy está ativado por padrão!
+
+Como funciona:
+1. O frontend envia requisições para `/api/n8n` (mesma origem)
+2. O servidor Next.js encaminha a requisição para o N8N
+3. O servidor Next.js retorna a resposta para o frontend
+4. ✅ Sem problemas de CORS!
+
+### Desabilitar o Proxy (Não Recomendado)
+
+Se por algum motivo você quiser fazer requisições diretas ao N8N (não recomendado), você pode:
+
+1. **Configurar CORS no N8N:**
+
+   Adicione as seguintes variáveis de ambiente no seu arquivo `.env` do N8N:
+
+   ```env
+   N8N_CORS_ALLOW_ORIGIN=http://localhost:3001
+   # Para desenvolvimento, você pode usar:
+   # N8N_CORS_ALLOW_ORIGIN=*
+   ```
+
+   Reinicie o N8N após adicionar essas variáveis.
+
+2. **Desabilitar o proxy na aplicação:**
+
+   Nas configurações do provider N8N, adicione manualmente no localStorage:
+   ```javascript
+   // No console do navegador
+   const settings = JSON.parse(localStorage.getItem('ai-chat-settings'));
+   settings.provider.n8n.useProxy = false;
+   localStorage.setItem('ai-chat-settings', JSON.stringify(settings));
+   ```
+
+   **Nota:** Isso só funciona se você configurou CORS no N8N!
+
+### Configuração de Produção
+
+Em produção, configure o CORS do N8N para aceitar apenas o domínio do seu aplicativo:
+
+```env
+N8N_CORS_ALLOW_ORIGIN=https://seu-dominio.com
+```
+
+Ou continue usando o proxy (recomendado) sem precisar configurar CORS no N8N.
+
 ## Troubleshooting
 
 ### Erro: "N8N webhook URL not configured"

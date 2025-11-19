@@ -28,67 +28,63 @@ export class N8NProvider {
       },
     };
 
+    // Use proxy by default to avoid CORS issues
+    const useProxy = this.config.useProxy !== false; // default true
+
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => {
         controller.abort();
       }, this.config.timeout || 30000);
 
-      const response = await fetch(this.config.webhookUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...this.config.headers,
-        },
-        body: JSON.stringify(request),
-        signal: controller.signal,
-      });
+      let response: Response;
+
+      if (useProxy) {
+        // Use Next.js API route proxy
+        response = await fetch('/api/n8n', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            webhookUrl: this.config.webhookUrl,
+            headers: this.config.headers,
+            timeout: this.config.timeout,
+            ...request,
+          }),
+          signal: controller.signal,
+        });
+      } else {
+        // Direct call to N8N webhook (may have CORS issues)
+        response = await fetch(this.config.webhookUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...this.config.headers,
+          },
+          body: JSON.stringify(request),
+          signal: controller.signal,
+        });
+      }
 
       clearTimeout(timeout);
 
       if (!response.ok) {
-        // Try to get error details from response
-        let errorDetail = '';
+        // Try to get error message from response
         try {
-          const errorData = await response.text();
-          // Check if it's JSON
-          try {
-            const jsonError = JSON.parse(errorData);
-            errorDetail = jsonError.message || jsonError.error || '';
-          } catch {
-            // If not JSON, check if it's HTML (common for 404/500 errors)
-            if (errorData.includes('<!DOCTYPE') || errorData.includes('<html')) {
-              errorDetail = 'Server returned HTML instead of JSON. Check if the webhook URL is correct.';
-            } else {
-              errorDetail = errorData.substring(0, 100);
-            }
-          }
-        } catch {
-          errorDetail = 'Unable to get error details';
+          const errorData = await response.json();
+          throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        } catch (parseError) {
+          throw new Error(`HTTP error! status: ${response.status}`);
         }
-
-        const statusMessages: Record<number, string> = {
-          404: 'Webhook not found. Please check if the N8N webhook URL is correct.',
-          500: 'N8N server error. Please check your N8N workflow configuration.',
-          401: 'Unauthorized. Please check your N8N authentication headers.',
-          403: 'Forbidden. Please check your N8N permissions.',
-          503: 'N8N service unavailable. Please check if N8N is running.',
-        };
-
-        const statusMessage = statusMessages[response.status] || `HTTP error! status: ${response.status}`;
-        const fullMessage = errorDetail ? `${statusMessage}\n\nDetails: ${errorDetail}` : statusMessage;
-
-        throw new Error(fullMessage);
       }
 
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        throw new Error(
-          'N8N webhook returned non-JSON response. Please check your N8N workflow is configured to return JSON.'
-        );
-      }
+      const data = await response.json();
 
-      const data: N8NResponse = await response.json();
+      // If using proxy, error is returned in response body
+      if (useProxy && data.error) {
+        throw new Error(data.error);
+      }
 
       // Validate response structure
       if (!data.resposta) {

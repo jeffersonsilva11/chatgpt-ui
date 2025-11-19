@@ -35,6 +35,7 @@ export interface N8NConfig {
   webhookUrl: string;
   headers?: Record<string, string>;
   timeout?: number;
+  useProxy?: boolean; // Use Next.js API route proxy to avoid CORS (default: true)
 }
 
 export interface OpenAIConfig {
