@@ -88,7 +88,7 @@ export function Header() {
                       <p className="font-medium text-sm">{user.name}</p>
                       <p className="text-xs text-muted-foreground truncate">{user.email}</p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Role: <span className="capitalize">{user.role}</span>
+                        Função: <span className="capitalize">{user.role}</span>
                       </p>
                     </div>
                     <div className="p-2">
@@ -97,7 +97,7 @@ export function Header() {
                         onClick={handleLogout}
                       >
                         <LogOut size={16} />
-                        Logout
+                        Sair
                       </button>
                     </div>
                   </div>

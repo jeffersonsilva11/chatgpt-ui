@@ -69,7 +69,7 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
 
   const handleDeleteConversation = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm('Are you sure you want to delete this conversation?')) {
+    if (confirm('Tem certeza que deseja excluir esta conversa?')) {
       deleteConversation(id);
     }
   };
@@ -113,7 +113,7 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
         <div className="flex h-full flex-col">
           {/* Header */}
           <div className="flex items-center justify-between border-b p-4">
-            <h1 className="text-lg font-semibold">Conversations</h1>
+            <h1 className="text-lg font-semibold">Conversas</h1>
             <Button
               variant="ghost"
               size="icon"
@@ -157,7 +157,7 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
                 <div className="flex items-center gap-2">
                   <span>{selectedWorkflow?.icon || '🌐'}</span>
                   <span className="font-medium text-sm">
-                    {selectedWorkflow?.name || 'Select Workflow'}
+                    {selectedWorkflow?.name || 'Selecionar Workflow'}
                   </span>
                 </div>
                 <ChevronDown
@@ -200,7 +200,7 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
               onClick={handleNewConversation}
             >
               <PlusCircle size={20} />
-              New Conversation
+              Nova Conversa
             </Button>
           </div>
 
@@ -213,7 +213,7 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
               />
               <Input
                 type="text"
-                placeholder="Search conversations..."
+                placeholder="Buscar conversas..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9"
@@ -226,7 +226,7 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
             {filteredConversations.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-32 text-center text-muted-foreground text-sm">
                 <MessageSquare size={32} className="mb-2 opacity-50" />
-                <p>No conversations yet</p>
+                <p>Nenhuma conversa ainda</p>
               </div>
             ) : (
               <div className="space-y-1">
@@ -249,7 +249,7 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
                         size="icon"
                         className="h-6 w-6"
                         onClick={(e) => handleExportConversation(conversation.id, 'txt', e)}
-                        title="Export as TXT"
+                        title="Exportar como TXT"
                       >
                         <Download size={14} />
                       </Button>
@@ -258,7 +258,7 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
                         size="icon"
                         className="h-6 w-6 text-destructive hover:text-destructive"
                         onClick={(e) => handleDeleteConversation(conversation.id, e)}
-                        title="Delete"
+                        title="Excluir"
                       >
                         <Trash2 size={14} />
                       </Button>
@@ -271,21 +271,24 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
 
           {/* Footer */}
           <div className="border-t p-4 space-y-2">
-            <Button
-              variant="outline"
-              className="w-full justify-start gap-2"
-              onClick={onSettingsClick}
-            >
-              <Settings size={20} />
-              Settings
-            </Button>
+            {/* Settings button - only for admin users */}
+            {user?.role === 'admin' && (
+              <Button
+                variant="outline"
+                className="w-full justify-start gap-2"
+                onClick={onSettingsClick}
+              >
+                <Settings size={20} />
+                Configurações
+              </Button>
+            )}
             <Button
               variant="ghost"
               className="w-full justify-start gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
               onClick={handleLogout}
             >
               <LogOut size={20} />
-              Logout
+              Sair
             </Button>
           </div>
         </div>

@@ -138,8 +138,8 @@ export default function Home() {
         if (!webhookUrl || webhookUrl.trim() === '') {
           throw new Error(
             selectedWorkflow
-              ? `Webhook URL not configured for workflow "${selectedWorkflow.name}".`
-              : 'N8N webhook URL not configured. Please configure it in Settings.'
+              ? `URL do Webhook não configurada para o workflow "${selectedWorkflow.name}".`
+              : 'URL do Webhook N8N não configurada. Por favor, configure nas Configurações.'
           );
         }
 
@@ -212,7 +212,7 @@ export default function Home() {
         setStreamingMessage(null);
       } else {
         throw new Error(
-          'Provider not configured. Please configure your AI provider in settings.'
+          'Provedor não configurado. Por favor, configure seu provedor de IA nas configurações.'
         );
       }
 
@@ -232,7 +232,7 @@ export default function Home() {
       addMessage(conversationId, assistantMessage);
     } catch (error) {
       const errorMessage =
-        error instanceof Error ? error.message : 'An unknown error occurred';
+        error instanceof Error ? error.message : 'Ocorreu um erro desconhecido';
       setError(errorMessage);
 
       // Add error message
@@ -241,7 +241,7 @@ export default function Home() {
         role: 'assistant',
         content: {
           type: 'text',
-          text: `Error: ${errorMessage}`,
+          text: `Erro: ${errorMessage}`,
         },
         timestamp: Date.now(),
       };
@@ -273,13 +273,13 @@ export default function Home() {
             <div className="flex h-full items-center justify-center">
               <div className="text-center">
                 <MessageSquare size={64} className="mx-auto mb-4 text-muted-foreground" />
-                <h2 className="text-2xl font-bold mb-2">Start a conversation</h2>
+                <h2 className="text-2xl font-bold mb-2">Iniciar uma conversa</h2>
                 <p className="text-muted-foreground">
-                  Send a message to begin chatting with AI
+                  Envie uma mensagem para começar a conversar com a IA
                 </p>
                 <p className="text-sm text-muted-foreground mt-4">
-                  Press <kbd className="px-2 py-1 bg-muted rounded">⌘ K</kbd> to start a
-                  new conversation
+                  Pressione <kbd className="px-2 py-1 bg-muted rounded">⌘ K</kbd> para iniciar uma
+                  nova conversa
                 </p>
               </div>
             </div>
