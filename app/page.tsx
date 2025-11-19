@@ -93,6 +93,7 @@ export default function Home() {
 
     try {
       let responseText = '';
+      let n8nResponse: any = null; // Store full N8N response to access image data
 
       // Send to appropriate provider
       if (settings.provider.type === 'n8n' && settings.provider.n8n) {
@@ -114,6 +115,8 @@ export default function Home() {
           currentConversation?.messages || []
         );
 
+        // Store full response for later use (includes image, type, etc)
+        n8nResponse = response;
         responseText = response.resposta;
 
         // Simulate streaming for N8N
@@ -174,8 +177,10 @@ export default function Home() {
         id: `msg_${Date.now()}_assistant`,
         role: 'assistant',
         content: {
-          type: 'text',
+          type: n8nResponse?.tipo || 'text',
           text: responseText,
+          // Include image if N8N response contains one
+          ...(n8nResponse?.imagem && { imageUrl: n8nResponse.imagem }),
         },
         timestamp: Date.now(),
       };
