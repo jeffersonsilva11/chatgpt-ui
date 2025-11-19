@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { useChatStore } from '@/lib/store';
+import { useAuthStore } from '@/lib/store/auth';
 import { Sidebar } from '@/components/chat/Sidebar';
 import { Header } from '@/components/chat/Header';
 import { ChatMessage } from '@/components/chat/ChatMessage';
@@ -16,6 +18,8 @@ import { GrokProvider } from '@/lib/providers/grok';
 import { MessageSquare } from 'lucide-react';
 
 export default function Home() {
+  const router = useRouter();
+  const { user, isAuthenticated, checkAuth, selectedWorkflow } = useAuthStore();
   const {
     loadConversations,
     loadSettings,
@@ -31,14 +35,40 @@ export default function Home() {
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [streamingMessage, setStreamingMessage] = useState<string | null>(null);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const currentConversation = getCurrentConversation();
 
+  // Verificar autenticação
   useEffect(() => {
-    loadSettings();
-    loadConversations();
-  }, [loadConversations, loadSettings]);
+    checkAuth().then((authenticated) => {
+      setIsCheckingAuth(false);
+
+      if (!authenticated) {
+        router.push('/login');
+        return;
+      }
+
+      // Verificar status do usuário
+      if (user?.status === 'pending') {
+        router.push('/pending');
+        return;
+      }
+
+      if (user?.status === 'inactive') {
+        router.push('/login');
+        return;
+      }
+    });
+  }, [checkAuth, router, user]);
+
+  useEffect(() => {
+    if (isAuthenticated && user?.status === 'active') {
+      loadSettings();
+      loadConversations();
+    }
+  }, [loadConversations, loadSettings, isAuthenticated, user]);
 
   useEffect(() => {
     scrollToBottom();
@@ -207,6 +237,15 @@ export default function Home() {
       setLoading(false);
     }
   };
+
+  // Loading state enquanto verifica autenticação
+  if (isCheckingAuth) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <Loading />
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen overflow-hidden">

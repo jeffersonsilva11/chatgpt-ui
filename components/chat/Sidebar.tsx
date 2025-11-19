@@ -1,6 +1,8 @@
 'use client';
 
 import { useChatStore } from '@/lib/store';
+import { useAuthStore } from '@/lib/store/auth';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
 import {
@@ -12,6 +14,9 @@ import {
   Menu,
   Search,
   Download,
+  LogOut,
+  User,
+  ChevronDown,
 } from 'lucide-react';
 import { useState } from 'react';
 import { Input } from '@/components/ui/input';
@@ -26,6 +31,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ onSettingsClick }: SidebarProps) {
+  const router = useRouter();
   const {
     conversations,
     currentConversationId,
@@ -36,7 +42,10 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
     toggleSidebar,
   } = useChatStore();
 
+  const { user, selectedWorkflow, setSelectedWorkflow, logout } = useAuthStore();
+
   const [searchQuery, setSearchQuery] = useState('');
+  const [showWorkflowMenu, setShowWorkflowMenu] = useState(false);
 
   const filteredConversations = conversations.filter((conv) =>
     conv.title.toLowerCase().includes(searchQuery.toLowerCase())
@@ -65,6 +74,11 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
       const content = exportConversationAsJSON(conversation);
       downloadFile(content, `${conversation.title}.json`, 'application/json');
     }
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    router.push('/login');
   };
 
   return (
@@ -97,6 +111,75 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
               <X size={20} />
             </Button>
           </div>
+
+          {/* User Profile */}
+          {user && (
+            <div className="px-4 py-3 border-b">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  {user.avatarUrl ? (
+                    <img
+                      src={user.avatarUrl}
+                      alt={user.name}
+                      className="h-10 w-10 rounded-full object-cover"
+                    />
+                  ) : (
+                    <User size={20} className="text-primary" />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm truncate">{user.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Workflow Selector */}
+          {user && user.workflows && user.workflows.length > 1 && (
+            <div className="px-4 py-3 border-b">
+              <button
+                className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-muted transition-colors"
+                onClick={() => setShowWorkflowMenu(!showWorkflowMenu)}
+              >
+                <div className="flex items-center gap-2">
+                  <span>{selectedWorkflow?.icon || '🌐'}</span>
+                  <span className="font-medium text-sm">
+                    {selectedWorkflow?.name || 'Select Workflow'}
+                  </span>
+                </div>
+                <ChevronDown
+                  size={16}
+                  className={cn(
+                    'transition-transform',
+                    showWorkflowMenu && 'rotate-180'
+                  )}
+                />
+              </button>
+              {showWorkflowMenu && (
+                <div className="mt-2 space-y-1">
+                  {user.workflows.map((workflow) => (
+                    <button
+                      key={workflow.id}
+                      className={cn(
+                        'w-full flex items-center gap-2 p-2 rounded-lg text-sm transition-colors',
+                        selectedWorkflow?.id === workflow.id
+                          ? 'bg-primary/10 text-primary'
+                          : 'hover:bg-muted'
+                      )}
+                      onClick={() => {
+                        setSelectedWorkflow(workflow);
+                        setShowWorkflowMenu(false);
+                      }}
+                    >
+                      <span>{workflow.icon || '🌐'}</span>
+                      <span>{workflow.name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* New conversation button */}
           <div className="p-4">
@@ -175,7 +258,7 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
           </div>
 
           {/* Footer */}
-          <div className="border-t p-4">
+          <div className="border-t p-4 space-y-2">
             <Button
               variant="outline"
               className="w-full justify-start gap-2"
@@ -183,6 +266,14 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
             >
               <Settings size={20} />
               Settings
+            </Button>
+            <Button
+              variant="ghost"
+              className="w-full justify-start gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+              onClick={handleLogout}
+            >
+              <LogOut size={20} />
+              Logout
             </Button>
           </div>
         </div>
