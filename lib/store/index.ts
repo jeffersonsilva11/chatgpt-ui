@@ -21,13 +21,13 @@ interface ChatStore {
   error: string | null;
 
   // Actions
-  loadConversations: () => void;
-  createConversation: () => string;
+  loadConversations: () => Promise<void>;
+  createConversation: (workflowId?: string) => Promise<string>;
   setCurrentConversation: (id: string | null) => void;
   getCurrentConversation: () => Conversation | null;
-  addMessage: (conversationId: string, message: Message) => void;
-  updateConversationTitle: (conversationId: string, title: string) => void;
-  deleteConversation: (id: string) => void;
+  addMessage: (conversationId: string, message: Message) => Promise<void>;
+  updateConversationTitle: (conversationId: string, title: string) => Promise<void>;
+  deleteConversation: (id: string) => Promise<void>;
   clearAllConversations: () => void;
   loadSettings: () => void;
   updateSettings: (settings: Partial<AppSettings>) => void;
@@ -47,30 +47,143 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   error: null,
 
   // Actions
-  loadConversations: () => {
-    const conversations = getConversations();
-    const currentId = getCurrentConversationId();
-    set({ conversations, currentConversationId: currentId });
+  loadConversations: async () => {
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+
+      if (!token) {
+        // Fallback to localStorage if not authenticated
+        const conversations = getConversations();
+        const currentId = getCurrentConversationId();
+        set({ conversations, currentConversationId: currentId });
+        return;
+      }
+
+      const response = await fetch('/api/conversations', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to load conversations');
+      }
+
+      const data = await response.json();
+
+      // Convert API format to store format
+      const conversations: Conversation[] = await Promise.all(
+        data.conversations.map(async (conv: any) => {
+          // Fetch messages for each conversation
+          const messagesResponse = await fetch(`/api/conversations/${conv.id}/messages`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+
+          const messagesData = await messagesResponse.json();
+
+          return {
+            id: conv.id,
+            title: conv.title,
+            workflowId: conv.workflowId,
+            messages: messagesData.messages || [],
+            createdAt: new Date(conv.createdAt).getTime(),
+            updatedAt: new Date(conv.updatedAt).getTime(),
+          };
+        })
+      );
+
+      set({ conversations });
+    } catch (error) {
+      console.error('Error loading conversations:', error);
+      // Fallback to localStorage on error
+      const conversations = getConversations();
+      const currentId = getCurrentConversationId();
+      set({ conversations, currentConversationId: currentId });
+    }
   },
 
-  createConversation: () => {
-    const newConversation: Conversation = {
-      id: `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      title: 'New Conversation',
-      messages: [],
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    };
+  createConversation: async (workflowId?: string) => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
 
-    saveConversation(newConversation);
-    setCurrentConversationId(newConversation.id);
+    if (!token) {
+      // Fallback to localStorage if not authenticated
+      const newConversation: Conversation = {
+        id: `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        title: 'New Conversation',
+        messages: [],
+        workflowId,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
 
-    set((state) => ({
-      conversations: [newConversation, ...state.conversations],
-      currentConversationId: newConversation.id,
-    }));
+      saveConversation(newConversation);
+      setCurrentConversationId(newConversation.id);
 
-    return newConversation.id;
+      set((state) => ({
+        conversations: [newConversation, ...state.conversations],
+        currentConversationId: newConversation.id,
+      }));
+
+      return newConversation.id;
+    }
+
+    try {
+      const response = await fetch('/api/conversations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          title: 'New Conversation',
+          workflowId,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create conversation');
+      }
+
+      const data = await response.json();
+      const newConversation: Conversation = {
+        id: data.conversation.id,
+        title: data.conversation.title,
+        messages: [],
+        workflowId: data.conversation.workflowId,
+        createdAt: new Date(data.conversation.createdAt).getTime(),
+        updatedAt: new Date(data.conversation.updatedAt).getTime(),
+      };
+
+      set((state) => ({
+        conversations: [newConversation, ...state.conversations],
+        currentConversationId: newConversation.id,
+      }));
+
+      return newConversation.id;
+    } catch (error) {
+      console.error('Error creating conversation:', error);
+      // Fallback to localStorage
+      const newConversation: Conversation = {
+        id: `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        title: 'New Conversation',
+        messages: [],
+        workflowId,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+
+      saveConversation(newConversation);
+      setCurrentConversationId(newConversation.id);
+
+      set((state) => ({
+        conversations: [newConversation, ...state.conversations],
+        currentConversationId: newConversation.id,
+      }));
+
+      return newConversation.id;
+    }
   },
 
   setCurrentConversation: (id: string | null) => {
@@ -83,12 +196,15 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     return conversations.find((c) => c.id === currentConversationId) || null;
   },
 
-  addMessage: (conversationId: string, message: Message) => {
+  addMessage: async (conversationId: string, message: Message) => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+
     const { conversations } = get();
     const conversation = conversations.find((c) => c.id === conversationId);
 
     if (!conversation) return;
 
+    // Update locally immediately for responsiveness
     const updatedMessages = [...conversation.messages, message];
     const updatedConversation: Conversation = {
       ...conversation,
@@ -96,27 +212,59 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       updatedAt: Date.now(),
     };
 
-    // Auto-generate title from first user message
-    if (
-      updatedMessages.length === 1 &&
-      message.role === 'user' &&
-      conversation.title === 'New Conversation'
-    ) {
-      const firstMessage = message.content.text || 'Conversation';
-      const title = firstMessage.slice(0, 50) + (firstMessage.length > 50 ? '...' : '');
-      updatedConversation.title = title;
-    }
-
-    saveConversation(updatedConversation);
-
     set((state) => ({
       conversations: state.conversations.map((c) =>
         c.id === conversationId ? updatedConversation : c
       ),
     }));
+
+    if (!token) {
+      // Fallback to localStorage if not authenticated
+      // Auto-generate title from first user message
+      if (
+        updatedMessages.length === 1 &&
+        message.role === 'user' &&
+        conversation.title === 'New Conversation'
+      ) {
+        const firstMessage = message.content.text || 'Conversation';
+        const title = firstMessage.slice(0, 50) + (firstMessage.length > 50 ? '...' : '');
+        updatedConversation.title = title;
+      }
+
+      saveConversation(updatedConversation);
+      return;
+    }
+
+    try {
+      // Save to database
+      const response = await fetch(`/api/conversations/${conversationId}/messages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          role: message.role,
+          content: message.content,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to add message');
+      }
+
+      // Title is auto-updated on backend, no need to do it here
+    } catch (error) {
+      console.error('Error adding message:', error);
+      // Already updated locally, continue working
+      // Fallback to localStorage
+      saveConversation(updatedConversation);
+    }
   },
 
-  updateConversationTitle: (conversationId: string, title: string) => {
+  updateConversationTitle: async (conversationId: string, title: string) => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+
     const { conversations } = get();
     const conversation = conversations.find((c) => c.id === conversationId);
 
@@ -128,18 +276,44 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       updatedAt: Date.now(),
     };
 
-    saveConversation(updatedConversation);
-
+    // Update locally immediately
     set((state) => ({
       conversations: state.conversations.map((c) =>
         c.id === conversationId ? updatedConversation : c
       ),
     }));
+
+    if (!token) {
+      // Fallback to localStorage
+      saveConversation(updatedConversation);
+      return;
+    }
+
+    try {
+      // Update in database
+      const response = await fetch(`/api/conversations/${conversationId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ title }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update conversation title');
+      }
+    } catch (error) {
+      console.error('Error updating conversation title:', error);
+      // Already updated locally
+      saveConversation(updatedConversation);
+    }
   },
 
-  deleteConversation: (id: string) => {
-    deleteConversationStorage(id);
+  deleteConversation: async (id: string) => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
 
+    // Delete locally immediately
     const { currentConversationId } = get();
     const updates: Partial<ChatStore> = {
       conversations: get().conversations.filter((c) => c.id !== id),
@@ -151,6 +325,30 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     }
 
     set(updates);
+
+    if (!token) {
+      // Fallback to localStorage
+      deleteConversationStorage(id);
+      return;
+    }
+
+    try {
+      // Delete from database
+      const response = await fetch(`/api/conversations/${id}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete conversation');
+      }
+    } catch (error) {
+      console.error('Error deleting conversation:', error);
+      // Already deleted locally
+      deleteConversationStorage(id);
+    }
   },
 
   clearAllConversations: () => {

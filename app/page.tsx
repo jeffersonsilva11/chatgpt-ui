@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { useChatStore } from '@/lib/store';
+import { useAuthStore } from '@/lib/store/auth';
 import { Sidebar } from '@/components/chat/Sidebar';
 import { Header } from '@/components/chat/Header';
 import { ChatMessage } from '@/components/chat/ChatMessage';
@@ -16,6 +18,8 @@ import { GrokProvider } from '@/lib/providers/grok';
 import { MessageSquare } from 'lucide-react';
 
 export default function Home() {
+  const router = useRouter();
+  const { user, isAuthenticated, checkAuth, selectedWorkflow } = useAuthStore();
   const {
     loadConversations,
     loadSettings,
@@ -31,14 +35,40 @@ export default function Home() {
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [streamingMessage, setStreamingMessage] = useState<string | null>(null);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const currentConversation = getCurrentConversation();
 
+  // Verificar autenticação
   useEffect(() => {
-    loadSettings();
-    loadConversations();
-  }, [loadConversations, loadSettings]);
+    checkAuth().then((authenticated) => {
+      setIsCheckingAuth(false);
+
+      if (!authenticated) {
+        router.push('/login');
+        return;
+      }
+
+      // Verificar status do usuário
+      if (user?.status === 'pending') {
+        router.push('/pending');
+        return;
+      }
+
+      if (user?.status === 'inactive') {
+        router.push('/login');
+        return;
+      }
+    });
+  }, [checkAuth, router, user]);
+
+  useEffect(() => {
+    if (isAuthenticated && user?.status === 'active') {
+      loadSettings();
+      loadConversations();
+    }
+  }, [loadConversations, loadSettings, isAuthenticated, user]);
 
   useEffect(() => {
     scrollToBottom();
@@ -50,13 +80,13 @@ export default function Home() {
       // Cmd/Ctrl + K for new conversation
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
-        createConversation();
+        createConversation(selectedWorkflow?.id);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [createConversation]);
+  }, [createConversation, selectedWorkflow]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -71,7 +101,7 @@ export default function Home() {
 
     // Create conversation if none exists
     if (!conversationId) {
-      conversationId = createConversation();
+      conversationId = createConversation(selectedWorkflow?.id);
     }
 
     // Add user message
@@ -93,17 +123,31 @@ export default function Home() {
 
     try {
       let responseText = '';
+      let n8nResponse: any = null; // Store full N8N response to access image data
 
       // Send to appropriate provider
       if (settings.provider.type === 'n8n' && settings.provider.n8n) {
+        // Use workflow-specific webhook URL if workflow is selected
+        let webhookUrl = settings.provider.n8n.webhookUrl;
+
+        if (selectedWorkflow?.webhookUrl) {
+          webhookUrl = selectedWorkflow.webhookUrl;
+        }
+
         // Validate N8N configuration
-        if (!settings.provider.n8n.webhookUrl || settings.provider.n8n.webhookUrl.trim() === '') {
+        if (!webhookUrl || webhookUrl.trim() === '') {
           throw new Error(
-            'N8N webhook URL not configured. Please configure it in Settings.'
+            selectedWorkflow
+              ? `URL do Webhook não configurada para o workflow "${selectedWorkflow.name}".`
+              : 'URL do Webhook N8N não configurada. Por favor, configure nas Configurações.'
           );
         }
 
-        const provider = new N8NProvider(settings.provider.n8n);
+        const provider = new N8NProvider({
+          ...settings.provider.n8n,
+          webhookUrl,
+        });
+
         const messageType: 'text' | 'image' | 'audio' =
           type === 'mixed' ? 'text' : type;
         const response = await provider.sendMessageWithRetry(
@@ -111,9 +155,12 @@ export default function Home() {
           messageType,
           file,
           conversationId,
-          currentConversation?.messages || []
+          currentConversation?.messages || [],
+          selectedWorkflow?.id
         );
 
+        // Store full response for later use (includes image, type, etc)
+        n8nResponse = response;
         responseText = response.resposta;
 
         // Simulate streaming for N8N
@@ -165,7 +212,7 @@ export default function Home() {
         setStreamingMessage(null);
       } else {
         throw new Error(
-          'Provider not configured. Please configure your AI provider in settings.'
+          'Provedor não configurado. Por favor, configure seu provedor de IA nas configurações.'
         );
       }
 
@@ -174,8 +221,10 @@ export default function Home() {
         id: `msg_${Date.now()}_assistant`,
         role: 'assistant',
         content: {
-          type: 'text',
+          type: n8nResponse?.tipo || 'text',
           text: responseText,
+          // Include image if N8N response contains one
+          ...(n8nResponse?.imagem && { imageUrl: n8nResponse.imagem }),
         },
         timestamp: Date.now(),
       };
@@ -183,7 +232,7 @@ export default function Home() {
       addMessage(conversationId, assistantMessage);
     } catch (error) {
       const errorMessage =
-        error instanceof Error ? error.message : 'An unknown error occurred';
+        error instanceof Error ? error.message : 'Ocorreu um erro desconhecido';
       setError(errorMessage);
 
       // Add error message
@@ -192,7 +241,7 @@ export default function Home() {
         role: 'assistant',
         content: {
           type: 'text',
-          text: `Error: ${errorMessage}`,
+          text: `Erro: ${errorMessage}`,
         },
         timestamp: Date.now(),
       };
@@ -202,6 +251,15 @@ export default function Home() {
       setLoading(false);
     }
   };
+
+  // Loading state enquanto verifica autenticação
+  if (isCheckingAuth) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <Loading />
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -215,13 +273,13 @@ export default function Home() {
             <div className="flex h-full items-center justify-center">
               <div className="text-center">
                 <MessageSquare size={64} className="mx-auto mb-4 text-muted-foreground" />
-                <h2 className="text-2xl font-bold mb-2">Start a conversation</h2>
+                <h2 className="text-2xl font-bold mb-2">Iniciar uma conversa</h2>
                 <p className="text-muted-foreground">
-                  Send a message to begin chatting with AI
+                  Envie uma mensagem para começar a conversar com a IA
                 </p>
                 <p className="text-sm text-muted-foreground mt-4">
-                  Press <kbd className="px-2 py-1 bg-muted rounded">⌘ K</kbd> to start a
-                  new conversation
+                  Pressione <kbd className="px-2 py-1 bg-muted rounded">⌘ K</kbd> para iniciar uma
+                  nova conversa
                 </p>
               </div>
             </div>

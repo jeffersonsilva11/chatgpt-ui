@@ -79,7 +79,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
                         <button
                           onClick={() => handleCopy(codeString)}
                           className="absolute right-2 top-2 p-2 rounded-md bg-background/80 hover:bg-background opacity-0 group-hover:opacity-100 transition-opacity"
-                          aria-label="Copy code"
+                          aria-label="Copiar código"
                         >
                           {copied ? (
                             <Check size={16} className="text-green-500" />
@@ -152,7 +152,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
                 }
                 className="w-full max-w-md"
               >
-                Your browser does not support the audio element.
+                Seu navegador não suporta o elemento de áudio.
               </audio>
             </div>
           )}

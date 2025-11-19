@@ -1,6 +1,8 @@
 'use client';
 
 import { useChatStore } from '@/lib/store';
+import { useAuthStore } from '@/lib/store/auth';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
 import {
@@ -12,6 +14,9 @@ import {
   Menu,
   Search,
   Download,
+  LogOut,
+  User,
+  ChevronDown,
 } from 'lucide-react';
 import { useState } from 'react';
 import { Input } from '@/components/ui/input';
@@ -26,6 +31,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ onSettingsClick }: SidebarProps) {
+  const router = useRouter();
   const {
     conversations,
     currentConversationId,
@@ -36,19 +42,34 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
     toggleSidebar,
   } = useChatStore();
 
-  const [searchQuery, setSearchQuery] = useState('');
+  const { user, selectedWorkflow, setSelectedWorkflow, logout } = useAuthStore();
 
-  const filteredConversations = conversations.filter((conv) =>
-    conv.title.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showWorkflowMenu, setShowWorkflowMenu] = useState(false);
+
+  // Filter conversations by workflow and search query
+  const filteredConversations = conversations.filter((conv) => {
+    // Filter by search query
+    const matchesSearch = conv.title.toLowerCase().includes(searchQuery.toLowerCase());
+
+    // Filter by workflow (if user has multiple workflows)
+    if (user && user.workflows && user.workflows.length > 1 && selectedWorkflow) {
+      const matchesWorkflow = conv.workflowId === selectedWorkflow.id;
+      return matchesSearch && matchesWorkflow;
+    }
+
+    return matchesSearch;
+  });
 
   const handleNewConversation = () => {
-    createConversation();
+    // Create conversation associated with selected workflow
+    const workflowId = selectedWorkflow?.id;
+    createConversation(workflowId);
   };
 
   const handleDeleteConversation = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm('Are you sure you want to delete this conversation?')) {
+    if (confirm('Tem certeza que deseja excluir esta conversa?')) {
       deleteConversation(id);
     }
   };
@@ -65,6 +86,11 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
       const content = exportConversationAsJSON(conversation);
       downloadFile(content, `${conversation.title}.json`, 'application/json');
     }
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    router.push('/login');
   };
 
   return (
@@ -87,7 +113,7 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
         <div className="flex h-full flex-col">
           {/* Header */}
           <div className="flex items-center justify-between border-b p-4">
-            <h1 className="text-lg font-semibold">Conversations</h1>
+            <h1 className="text-lg font-semibold">Conversas</h1>
             <Button
               variant="ghost"
               size="icon"
@@ -98,6 +124,75 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
             </Button>
           </div>
 
+          {/* User Profile */}
+          {user && (
+            <div className="px-4 py-3 border-b">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  {user.avatarUrl ? (
+                    <img
+                      src={user.avatarUrl}
+                      alt={user.name}
+                      className="h-10 w-10 rounded-full object-cover"
+                    />
+                  ) : (
+                    <User size={20} className="text-primary" />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm truncate">{user.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Workflow Selector */}
+          {user && user.workflows && user.workflows.length > 1 && (
+            <div className="px-4 py-3 border-b">
+              <button
+                className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-muted transition-colors"
+                onClick={() => setShowWorkflowMenu(!showWorkflowMenu)}
+              >
+                <div className="flex items-center gap-2">
+                  <span>{selectedWorkflow?.icon || '🌐'}</span>
+                  <span className="font-medium text-sm">
+                    {selectedWorkflow?.name || 'Selecionar Workflow'}
+                  </span>
+                </div>
+                <ChevronDown
+                  size={16}
+                  className={cn(
+                    'transition-transform',
+                    showWorkflowMenu && 'rotate-180'
+                  )}
+                />
+              </button>
+              {showWorkflowMenu && (
+                <div className="mt-2 space-y-1">
+                  {user.workflows.map((workflow) => (
+                    <button
+                      key={workflow.id}
+                      className={cn(
+                        'w-full flex items-center gap-2 p-2 rounded-lg text-sm transition-colors',
+                        selectedWorkflow?.id === workflow.id
+                          ? 'bg-primary/10 text-primary'
+                          : 'hover:bg-muted'
+                      )}
+                      onClick={() => {
+                        setSelectedWorkflow(workflow);
+                        setShowWorkflowMenu(false);
+                      }}
+                    >
+                      <span>{workflow.icon || '🌐'}</span>
+                      <span>{workflow.name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* New conversation button */}
           <div className="p-4">
             <Button
@@ -105,7 +200,7 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
               onClick={handleNewConversation}
             >
               <PlusCircle size={20} />
-              New Conversation
+              Nova Conversa
             </Button>
           </div>
 
@@ -118,7 +213,7 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
               />
               <Input
                 type="text"
-                placeholder="Search conversations..."
+                placeholder="Buscar conversas..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9"
@@ -131,7 +226,7 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
             {filteredConversations.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-32 text-center text-muted-foreground text-sm">
                 <MessageSquare size={32} className="mb-2 opacity-50" />
-                <p>No conversations yet</p>
+                <p>Nenhuma conversa ainda</p>
               </div>
             ) : (
               <div className="space-y-1">
@@ -154,7 +249,7 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
                         size="icon"
                         className="h-6 w-6"
                         onClick={(e) => handleExportConversation(conversation.id, 'txt', e)}
-                        title="Export as TXT"
+                        title="Exportar como TXT"
                       >
                         <Download size={14} />
                       </Button>
@@ -163,7 +258,7 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
                         size="icon"
                         className="h-6 w-6 text-destructive hover:text-destructive"
                         onClick={(e) => handleDeleteConversation(conversation.id, e)}
-                        title="Delete"
+                        title="Excluir"
                       >
                         <Trash2 size={14} />
                       </Button>
@@ -175,14 +270,25 @@ export function Sidebar({ onSettingsClick }: SidebarProps) {
           </div>
 
           {/* Footer */}
-          <div className="border-t p-4">
+          <div className="border-t p-4 space-y-2">
+            {/* Settings button - only for admin users */}
+            {user?.role === 'admin' && (
+              <Button
+                variant="outline"
+                className="w-full justify-start gap-2"
+                onClick={onSettingsClick}
+              >
+                <Settings size={20} />
+                Configurações
+              </Button>
+            )}
             <Button
-              variant="outline"
-              className="w-full justify-start gap-2"
-              onClick={onSettingsClick}
+              variant="ghost"
+              className="w-full justify-start gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+              onClick={handleLogout}
             >
-              <Settings size={20} />
-              Settings
+              <LogOut size={20} />
+              Sair
             </Button>
           </div>
         </div>

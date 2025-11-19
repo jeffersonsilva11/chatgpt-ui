@@ -30,7 +30,7 @@ interface ChatInputProps {
 export function ChatInput({
   onSend,
   disabled = false,
-  placeholder = 'Type a message...',
+  placeholder = 'Digite uma mensagem...',
 }: ChatInputProps) {
   const [message, setMessage] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -122,7 +122,7 @@ export function ChatInput({
       const recording = await audioRecorderRef.current.stopRecording();
       const base64 = await blobToBase64(recording.blob);
 
-      onSend('Voice message', 'audio', base64);
+      onSend('Mensagem de voz', 'audio', base64);
 
       setIsRecording(false);
       setRecordingDuration(0);
@@ -152,7 +152,7 @@ export function ChatInput({
               <Mic size={20} className="text-destructive-foreground" />
             </div>
             <div>
-              <p className="text-sm font-medium">Recording...</p>
+              <p className="text-sm font-medium">Gravando...</p>
               <p className="text-xs text-muted-foreground">
                 {formatDuration(recordingDuration)}
               </p>
@@ -268,7 +268,7 @@ export function ChatInput({
         </div>
 
         <p className="text-xs text-muted-foreground mt-2">
-          Press Enter to send, Shift + Enter for new line
+          Pressione Enter para enviar, Shift + Enter para nova linha
         </p>
       </div>
     </div>

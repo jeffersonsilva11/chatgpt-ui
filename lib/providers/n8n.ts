@@ -12,7 +12,8 @@ export class N8NProvider {
     messageType: 'text' | 'image' | 'audio',
     file: string | undefined,
     conversationId: string,
-    history: Message[]
+    history: Message[],
+    workflowId?: string
   ): Promise<N8NResponse> {
     const request: N8NRequest = {
       mensagem: message,
@@ -24,6 +25,7 @@ export class N8NProvider {
       })),
       metadata: {
         conversaId: conversationId,
+        workflowId,
         timestamp: new Date().toISOString(),
       },
     };
@@ -114,13 +116,21 @@ export class N8NProvider {
     file: string | undefined,
     conversationId: string,
     history: Message[],
+    workflowId?: string,
     maxRetries: number = 3
   ): Promise<N8NResponse> {
     let lastError: Error | null = null;
 
     for (let i = 0; i < maxRetries; i++) {
       try {
-        return await this.sendMessage(message, messageType, file, conversationId, history);
+        return await this.sendMessage(
+          message,
+          messageType,
+          file,
+          conversationId,
+          history,
+          workflowId
+        );
       } catch (error) {
         lastError = error instanceof Error ? error : new Error('Unknown error');
         if (i < maxRetries - 1) {

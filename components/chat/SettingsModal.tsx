@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react';
 import { useChatStore } from '@/lib/store';
+import { useAuthStore } from '@/lib/store/auth';
 import {
   Dialog,
   DialogContent,
@@ -14,7 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { AIProvider } from '@/lib/types';
-import { Trash2, Upload } from 'lucide-react';
+import { Trash2, Upload, ShieldAlert } from 'lucide-react';
 import { fileToDataURL } from '@/lib/utils/file';
 
 interface SettingsModalProps {
@@ -24,6 +25,7 @@ interface SettingsModalProps {
 
 export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   const { settings, updateSettings, clearAllConversations } = useChatStore();
+  const { user } = useAuthStore();
 
   const [companyName, setCompanyName] = useState(settings.branding.companyName);
   const [logo, setLogo] = useState(settings.branding.logo);
@@ -55,12 +57,12 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      alert('Please select an image file');
+      alert('Por favor, selecione um arquivo de imagem');
       return;
     }
 
     if (file.size > 2 * 1024 * 1024) {
-      alert('Logo must be less than 2MB');
+      alert('O logo deve ter menos de 2MB');
       return;
     }
 
@@ -73,7 +75,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
     try {
       headers = JSON.parse(n8nHeaders);
     } catch {
-      alert('Invalid JSON for N8N headers');
+      alert('JSON inválido para cabeçalhos do N8N');
       return;
     }
 
@@ -112,34 +114,57 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   };
 
   const handleClearAll = () => {
-    if (confirm('Are you sure you want to delete all conversations? This cannot be undone.')) {
+    if (confirm('Tem certeza que deseja excluir todas as conversas? Esta ação não pode ser desfeita.')) {
       clearAllConversations();
       onOpenChange(false);
     }
   };
 
+  // Check if user is admin
+  if (user?.role !== 'admin') {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShieldAlert className="text-destructive" size={24} />
+              Acesso Negado
+            </DialogTitle>
+            <DialogDescription>
+              Apenas administradores podem acessar as configurações. Por favor, entre em contato
+              com seu administrador se precisar alterar as configurações.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end pt-4 border-t">
+            <Button onClick={() => onOpenChange(false)}>Fechar</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Settings</DialogTitle>
+          <DialogTitle>Configurações</DialogTitle>
           <DialogDescription>
-            Customize your AI chat experience and configure providers
+            Personalize sua experiência de chat com IA e configure os provedores
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">
           {/* Branding Section */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Branding</h3>
+            <h3 className="text-lg font-semibold">Marca</h3>
 
             <div className="space-y-2">
-              <Label htmlFor="company-name">Company Name</Label>
+              <Label htmlFor="company-name">Nome da Empresa</Label>
               <Input
                 id="company-name"
                 value={companyName}
                 onChange={(e) => setCompanyName(e.target.value)}
-                placeholder="My Company"
+                placeholder="Minha Empresa"
               />
             </div>
 
@@ -165,11 +190,11 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                   onClick={() => logoInputRef.current?.click()}
                 >
                   <Upload size={16} className="mr-2" />
-                  Upload Logo
+                  Carregar Logo
                 </Button>
                 {logo && (
                   <Button variant="outline" onClick={() => setLogo(undefined)}>
-                    Remove
+                    Remover
                   </Button>
                 )}
               </div>
@@ -177,7 +202,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="primary-color">Primary Color</Label>
+                <Label htmlFor="primary-color">Cor Primária</Label>
                 <div className="flex gap-2">
                   <Input
                     id="primary-color"
@@ -195,7 +220,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="secondary-color">Secondary Color</Label>
+                <Label htmlFor="secondary-color">Cor Secundária</Label>
                 <div className="flex gap-2">
                   <Input
                     id="secondary-color"
@@ -216,10 +241,10 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
 
           {/* AI Provider Section */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold">AI Provider</h3>
+            <h3 className="text-lg font-semibold">Provedor de IA</h3>
 
             <div className="space-y-2">
-              <Label>Select Provider</Label>
+              <Label>Selecionar Provedor</Label>
               <div className="grid grid-cols-2 gap-2">
                 {(['n8n', 'openai', 'gemini', 'grok'] as AIProvider[]).map((p) => (
                   <Button
@@ -237,16 +262,16 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
             {provider === 'n8n' && (
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="n8n-url">Webhook URL</Label>
+                  <Label htmlFor="n8n-url">URL do Webhook</Label>
                   <Input
                     id="n8n-url"
                     value={n8nUrl}
                     onChange={(e) => setN8nUrl(e.target.value)}
-                    placeholder="https://your-n8n-instance.com/webhook/..."
+                    placeholder="https://sua-instancia-n8n.com/webhook/..."
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="n8n-headers">Custom Headers (JSON)</Label>
+                  <Label htmlFor="n8n-headers">Cabeçalhos Personalizados (JSON)</Label>
                   <Textarea
                     id="n8n-headers"
                     value={n8nHeaders}
@@ -261,7 +286,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
             {provider === 'openai' && (
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="openai-key">API Key</Label>
+                  <Label htmlFor="openai-key">Chave da API</Label>
                   <Input
                     id="openai-key"
                     type="password"
@@ -271,7 +296,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="openai-model">Model</Label>
+                  <Label htmlFor="openai-model">Modelo</Label>
                   <Input
                     id="openai-model"
                     value={openaiModel}
@@ -285,7 +310,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
             {provider === 'gemini' && (
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="gemini-key">API Key</Label>
+                  <Label htmlFor="gemini-key">Chave da API</Label>
                   <Input
                     id="gemini-key"
                     type="password"
@@ -295,7 +320,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="gemini-model">Model</Label>
+                  <Label htmlFor="gemini-model">Modelo</Label>
                   <Input
                     id="gemini-model"
                     value={geminiModel}
@@ -308,7 +333,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
 
             {provider === 'grok' && (
               <div className="space-y-2">
-                <Label htmlFor="grok-key">API Key</Label>
+                <Label htmlFor="grok-key">Chave da API</Label>
                 <Input
                   id="grok-key"
                   type="password"
@@ -322,10 +347,10 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
 
           {/* Preferences Section */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Preferences</h3>
+            <h3 className="text-lg font-semibold">Preferências</h3>
 
             <div className="space-y-2">
-              <Label>Font Size</Label>
+              <Label>Tamanho da Fonte</Label>
               <div className="grid grid-cols-3 gap-2">
                 {(['small', 'medium', 'large'] as const).map((size) => (
                   <Button
@@ -333,7 +358,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                     variant={fontSize === size ? 'default' : 'outline'}
                     onClick={() => setFontSize(size)}
                   >
-                    {size.charAt(0).toUpperCase() + size.slice(1)}
+                    {size === 'small' ? 'Pequeno' : size === 'medium' ? 'Médio' : 'Grande'}
                   </Button>
                 ))}
               </div>
@@ -346,7 +371,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                 className="w-full"
               >
                 <Trash2 size={16} className="mr-2" />
-                Clear All Conversations
+                Limpar Todas as Conversas
               </Button>
             </div>
           </div>
@@ -354,9 +379,9 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
 
         <div className="flex justify-end gap-2 pt-4 border-t">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            Cancelar
           </Button>
-          <Button onClick={handleSave}>Save Changes</Button>
+          <Button onClick={handleSave}>Salvar Alterações</Button>
         </div>
       </DialogContent>
     </Dialog>

@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  output: 'standalone', // Para build Docker
   images: {
     remotePatterns: [
       {
@@ -8,6 +9,7 @@ const nextConfig: NextConfig = {
         hostname: '**',
       },
     ],
+    unoptimized: true, // Para funcionar com imagens externas
   },
 };
 
